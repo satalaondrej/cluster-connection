@@ -19,6 +19,7 @@ use Doctrine\DBAL\Exception\SyntaxErrorException;
 use Doctrine\DBAL\Exception\TableExistsException;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Throwable;
 
 class ClusterConnection extends Connection
 {
@@ -225,7 +226,8 @@ class ClusterConnection extends Connection
 
     private function queryLocalState()
     {
-        $statement = $this->query('SHOW GLOBAL STATUS LIKE "wsrep_local_state_comment"');
+		$sql = 'SHOW GLOBAL STATUS LIKE "wsrep_local_state_comment"';
+        $statement = $this->query($sql);
 
         $result = $statement->fetchColumn(1);
 
@@ -234,7 +236,11 @@ class ClusterConnection extends Connection
         }
 
         if ($result !== 'Synced') {
-            throw LocalStateNotSyncedException::withNode($this->selectedNode);
+			try {
+				throw LocalStateNotSyncedException::withNode($this->selectedNode, $result);
+			} catch (Throwable $e) {
+				$this->handleExceptionDuringQuery($e, $sql);
+			}
         }
     }
 
@@ -273,11 +279,13 @@ class ClusterConnection extends Connection
         $this->selectedNode = $this->selectNode();
 
         try {
-            $this->_conn = $this->connectTo($this->selectedNode);
+			$conn = $this->connectTo($this->selectedNode);
 
             if (count($this->nodes) > 0) {
-                $this->queryLocalState();
+				$this->queryLocalState();
             }
+
+			$this->_conn = $conn;
         } catch (DriverException $e) {
         	$this->processException($e);
         	return $this->connect();
