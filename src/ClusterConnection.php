@@ -279,13 +279,11 @@ class ClusterConnection extends Connection
         $this->selectedNode = $this->selectNode();
 
         try {
-			$conn = $this->connectTo($this->selectedNode);
+			$this->_conn = $this->connectTo($this->selectedNode);
 
             if (count($this->nodes) > 0) {
 				$this->queryLocalState();
             }
-
-			$this->_conn = $conn;
         } catch (DriverException $e) {
         	$this->processException($e);
         	return $this->connect();
